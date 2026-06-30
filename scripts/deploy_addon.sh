@@ -48,11 +48,16 @@ echo "    staged files: $(find "$STAGE" -type f | wc -l | tr -d ' ')"
 
 echo "==> Transferring to $REMOTE_DIR"
 $HA ssh "rm -rf $REMOTE_DIR && mkdir -p $REMOTE_DIR"
-tar czf - -C "$STAGE" . | $HA ssh "tar xzf - -C $REMOTE_DIR"
+# COPYFILE_DISABLE=1 stops macOS bsdtar from emitting AppleDouble ._* sidecar
+# files (extended-attribute junk) into the add-on dir on the box.
+COPYFILE_DISABLE=1 tar czf - -C "$STAGE" . | $HA ssh "tar xzf - -C $REMOTE_DIR"
+
+# Make Supervisor pick up the on-box files (new version metadata, or a
+# brand-new local add-on it has never seen).
+echo "==> Reloading add-on store"
+$HA store-reload
 
 if [ -n "$REF" ]; then
-  echo "==> Reloading add-on store (refresh version metadata)"
-  $HA store-reload
   echo "==> Registering deployed version via Supervisor update"
   if $HA update; then
     echo "    updated — Supervisor now reports the deployed version"
@@ -62,9 +67,17 @@ if [ -n "$REF" ]; then
     $HA restart
   fi
 else
-  echo "==> Rebuilding add-on image (this can take a few minutes on first build)"
-  $HA rebuild
-  # Supervisor `rebuild` does not start the container — always `restart` after.
+  # First-ever deploy: the add-on is not installed yet, so `rebuild` 404s.
+  # Install it; otherwise rebuild the existing image in place.
+  state="$($HA state-raw 2>/dev/null || echo unknown)"
+  if [ "$state" = "unknown" ] || [ -z "$state" ]; then
+    echo "==> First install (pulls the upstream image — can take a few minutes)"
+    $HA api POST "/addons/${SLUG:-local_actual_budget}/install" >/dev/null
+  else
+    echo "==> Rebuilding add-on image (this can take a few minutes on first build)"
+    $HA rebuild
+  fi
+  # Supervisor `rebuild`/`install` does not start the container — always start.
   echo "==> Starting add-on"
   $HA restart
 fi
