@@ -36,9 +36,17 @@ docs/ai/              # this doc (committed, provider-agnostic)
 
 ## Access model
 
-Direct LAN port `5006` (`http://<haos-ip>:5006`). No Ingress in the MVP — Actual
-is an SPA that does not handle HA's rotating `/api/hassio_ingress/<token>/`
-prefix. See the spec §5 for the shape of the future Ingress work.
+Direct LAN port `5006` over **HTTPS** (`https://<haos-ip>:5006`). HTTPS is
+mandatory: Actual uses `SharedArrayBuffer` behind cross-origin isolation
+(COOP/COEP), which browsers only honour in a secure context (HTTPS or
+localhost); over plain HTTP the SPA throws a `FatalError`. `addon/run.sh`
+generates a self-signed cert on first boot (stored on `/data/certs`, so it
+survives rebuilds) and points `ACTUAL_HTTPS_KEY` / `ACTUAL_HTTPS_CERT` at it.
+The browser shows a one-time self-signed-cert warning that the user accepts.
+
+No Ingress in the MVP — Actual is an SPA that does not handle HA's rotating
+`/api/hassio_ingress/<token>/` prefix. See the spec §5 for the shape of the
+future Ingress work.
 
 ## Deploy
 
@@ -61,8 +69,9 @@ First-time bring-up:
    image).
 2. `just redeploy` — Supervisor builds the Dockerfile, then restarts.
 3. `just smoke` — confirm the UI answers on `:5006`.
-4. Open `http://<haos-ip>:5006`, set the Actual server password, and switch the
-   language to Ukrainian (Settings → Language → Українська).
+4. Open `https://<haos-ip>:5006`, accept the self-signed cert warning, set the
+   Actual server password, and switch the language to Ukrainian
+   (Settings → Language → Українська).
 
 ## Image tag policy
 

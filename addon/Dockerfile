@@ -15,7 +15,17 @@ FROM actualbudget/actual-server:latest
 # first-boot write failure. (Revisit if we want least-privilege later.)
 USER root
 
-# Upstream entrypoint (tini -> node app.js), WORKDIR /app and EXPOSE 5006 are
-# inherited. Actual persists to /data by default, which coincides with the HAOS
-# add-on persistent volume — so persistence works with no extra config and no
-# CMD override.
+# Actual requires a secure context (HTTPS) for any non-localhost access, because
+# it relies on SharedArrayBuffer behind cross-origin isolation. We serve its
+# built-in HTTPS with a self-signed cert generated on first boot by run.sh, so
+# we need openssl in the image. (Upstream is Debian-based, not Alpine.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+# run.sh generates/persists the cert on /data, exports ACTUAL_HTTPS_* and execs
+# the upstream `node app.js`. WORKDIR /app and EXPOSE 5006 are inherited; the
+# upstream tini entrypoint runs this CMD. Actual still persists to /data.
+COPY run.sh /run.sh
+RUN chmod +x /run.sh
+CMD ["/run.sh"]

@@ -27,14 +27,18 @@ everything else is the push-based deploy machinery reused from the sibling
 ## Architecture (one line)
 
 `addon/Dockerfile` = `FROM actualbudget/actual-server:latest` + `USER root`.
-Actual's server listens on `:5006`, exposed as a direct LAN port. It persists
+Actual's server listens on `:5006` over **HTTPS** (self-signed cert generated on
+first boot by `addon/run.sh`, stored on `/data`), exposed as a direct LAN port.
+HTTPS is mandatory: Actual needs a secure context for `SharedArrayBuffer`, so
+plain `http://<lan-ip>` makes the SPA throw a `FatalError`. It persists
 ALL state to `/data` (`server-files/account.sqlite`, `user-files/`), which
 coincides with the HAOS add-on persistent volume — so persistence needs no
 config. Auth is Actual's own server password, set in-UI on first run.
 
 ## Access model (MVP)
 
-Direct LAN port: `http://192.168.68.140:5006`. **No Ingress** in the MVP — Actual
+Direct LAN port over HTTPS: `https://192.168.68.140:5006` (accept the
+self-signed cert once). **No Ingress** in the MVP — Actual
 is an SPA that does not cope with the rotating `/api/hassio_ingress/<token>`
 prefix (deferred; see the spec §5).
 

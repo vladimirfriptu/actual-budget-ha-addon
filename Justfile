@@ -40,14 +40,14 @@ ha-stop:
 ha-state:
     bash scripts/ha.sh state
 
-# Smoke test: assert the Actual web UI answers on the LAN port (HTTP 2xx/3xx).
-# Override the host with HA_HOST (defaults to the box in scripts/ha.sh).
+# Smoke test: assert the Actual web UI answers on the LAN port over HTTPS
+# (2xx/3xx). -k because the cert is self-signed. Override host with HA_HOST.
 smoke:
     #!/usr/bin/env bash
     set -euo pipefail
     host="${HA_HOST:-192.168.68.140}"
-    code="$(curl -fsS -o /dev/null -w '%{http_code}' "http://$host:5006/" || true)"
+    code="$(curl -fsSk -o /dev/null -w '%{http_code}' "https://$host:5006/" || true)"
     case "$code" in
-      2*|3*) echo "OK — Actual answered HTTP $code on http://$host:5006/" ;;
-      *)     echo "FAIL — got HTTP '${code:-no-response}' from http://$host:5006/" >&2; exit 1 ;;
+      2*|3*) echo "OK — Actual answered HTTP $code on https://$host:5006/" ;;
+      *)     echo "FAIL — got HTTP '${code:-no-response}' from https://$host:5006/" >&2; exit 1 ;;
     esac

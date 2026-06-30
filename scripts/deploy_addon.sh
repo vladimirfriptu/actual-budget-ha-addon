@@ -41,7 +41,7 @@ fi
 cd "$BUILD_ROOT"
 
 echo "==> Staging build context"
-cp addon/config.yaml addon/Dockerfile "$STAGE/"
+cp addon/config.yaml addon/Dockerfile addon/run.sh "$STAGE/"
 # Optional cosmetic assets — copied only if present (none in the MVP).
 cp addon/icon.png addon/logo.png "$STAGE/" 2>/dev/null || true
 echo "    staged files: $(find "$STAGE" -type f | wc -l | tr -d ' ')"

@@ -12,11 +12,20 @@ rebuilds/restarts.
 
 ## Access
 
-The web UI is published on the LAN at **`http://<haos-ip>:5006`**
-(e.g. `http://192.168.68.140:5006`). Auth is Actual's own **server password**,
+The web UI is published on the LAN at **`https://<haos-ip>:5006`**
+(e.g. `https://192.168.68.140:5006`). Auth is Actual's own **server password**,
 which you set in the UI on first run. There is no Home Assistant sidebar
 (Ingress) integration in this MVP — Actual is a single-page app that does not
 cope with HA's rotating ingress URL prefix.
+
+> **HTTPS is required, not optional.** Actual relies on `SharedArrayBuffer`
+> behind cross-origin isolation, which browsers only allow in a *secure
+> context* (HTTPS or `localhost`). Over plain `http://<lan-ip>` the app dies
+> with a `FatalError`. The add-on therefore serves Actual's built-in HTTPS with
+> a **self-signed certificate** generated on first boot (stored on `/data`).
+> Your browser will show a one-time "your connection is not private" warning —
+> accept it ("Proceed to …"); after that the origin is a secure context and
+> Actual works.
 
 ## First run
 
@@ -25,7 +34,8 @@ cope with HA's rotating ingress URL prefix.
 2. From this repo: `just redeploy` — pushes the add-on to HAOS over SSH, builds
    the image, and starts it.
 3. `just smoke` — checks that the UI answers on port 5006.
-4. Open `http://<haos-ip>:5006`, set a server password, then switch the language
+4. Open `https://<haos-ip>:5006`, accept the self-signed cert warning, set a
+   server password, then switch the language
    to Ukrainian in **Settings → Language → Українська**. Expect ~20% of rarer
    screens to fall back to English.
 
