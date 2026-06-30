@@ -1,0 +1,11 @@
+# --- Secrets / state (never commit) ---
+.env
+.env.local
+
+# --- IDE / OS / AI config ---
+.idea/
+.DS_Store
+# Track the Claude agent config (CLAUDE.md + skills); ignore everything else
+# under .claude (settings.local.json, specs, plans, ...).
+.claude/*
+!.claude/skills/

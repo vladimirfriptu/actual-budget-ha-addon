@@ -1,0 +1,17 @@
+name: actual_budget
+slug: actual_budget
+version: "0.1.0"
+description: >-
+  Actual Budget (open-source envelope budgeting) packaged as a local
+  Home Assistant add-on. Data persists on /data.
+arch:
+  - amd64            # HAOS host is amd64, same as the sibling
+init: false
+ports:
+  5006/tcp: 5006
+ports_description:
+  5006/tcp: Actual Budget web UI (reachable on the LAN)
+# Ingress intentionally omitted in the MVP — see spec §5. Actual is an SPA that
+# does not cope with the rotating /api/hassio_ingress/<token> prefix.
+# No options/schema for the MVP. Actual sets its server password in-UI on first
+# run. Add env-backed options later only if needed.
