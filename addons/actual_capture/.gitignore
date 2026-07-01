@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+
+# add-on options with secrets (never commit)
+.options.json
+.actual-cache/
+seed.yaml
+seed.input.md

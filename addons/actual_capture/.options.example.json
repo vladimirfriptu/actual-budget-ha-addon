@@ -1,0 +1,14 @@
+{
+  "bot_token": "",
+  "owner_chat_id": 0,
+  "openrouter_api_key": "",
+  "openrouter_text_model": "openai/gpt-4o-mini",
+  "openrouter_vision_model": "openai/gpt-4o-mini",
+  "groq_api_key": "",
+  "groq_model": "whisper-large-v3-turbo",
+  "actual_url": "https://192.168.68.140:5006",
+  "actual_password": "",
+  "actual_budget_sync_id": "",
+  "actual_e2e_password": "",
+  "default_cash_account": "Наличные"
+}

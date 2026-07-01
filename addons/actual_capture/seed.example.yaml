@@ -1,0 +1,16 @@
+# Copy to seed.yaml and fill with your CURRENT state (balances-only migration).
+# Idempotent: re-running skips accounts/categories that already exist by name.
+# To re-seed from scratch: `CONFIRM=yes just reset actual_budget` then `just cap-seed`.
+
+accounts:
+  # name must match Actual exactly; the cash one must equal default_cash_account.
+  - { name: "Наличные",       balance: 0.00 }
+  # 2 cards in one bank — distinguish by last digits:
+  - { name: "Монобанк ·1234", balance: 0.00 }
+  - { name: "Монобанк ·5678", balance: 0.00 }
+
+categoryGroups:
+  - name: "Стройка"
+    categories: ["Матеріали", "Робота", "Інструмент"]
+  - name: "Щоденні"
+    categories: ["Продукти", "Транспорт", "Кафе", "Комуналка"]
