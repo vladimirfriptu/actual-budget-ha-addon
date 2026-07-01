@@ -34,4 +34,7 @@ for (const [k, env] of Object.entries(map)) {
 JS
 )"
 
+# Diagnostic (no secret values — only key names and string lengths).
+node -e 'try{const o=JSON.parse(require("fs").readFileSync("/data/options.json","utf8"));console.error("[run.sh] options.json:",JSON.stringify(Object.fromEntries(Object.entries(o).map(([k,v])=>[k,typeof v==="string"?v.length:v]))))}catch(e){console.error("[run.sh] options.json error:",e.message)}'
+
 exec node /app/dist/index.js

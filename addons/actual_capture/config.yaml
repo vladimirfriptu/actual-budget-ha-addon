@@ -1,6 +1,6 @@
 name: actual_capture
 slug: actual_capture
-version: "0.1.0"
+version: "0.1.1"
 description: >-
   Telegram + OpenRouter capture service for Actual Budget. Send an expense as
   text or a receipt photo; it files a draft transaction into Actual for evening
