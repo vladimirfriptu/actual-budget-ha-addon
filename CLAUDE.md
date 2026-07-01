@@ -26,9 +26,9 @@ everything else is the push-based deploy machinery reused from the sibling
 
 ## Architecture (one line)
 
-`addon/Dockerfile` = `FROM actualbudget/actual-server:latest` + `USER root`.
+`addons/actual_budget/Dockerfile` = `FROM actualbudget/actual-server:latest` + `USER root`.
 Actual's server listens on `:5006` over **HTTPS** (self-signed cert generated on
-first boot by `addon/run.sh`, stored on `/data`), exposed as a direct LAN port.
+first boot by `addons/actual_budget/run.sh`, stored on `/data`), exposed as a direct LAN port.
 HTTPS is mandatory: Actual needs a secure context for `SharedArrayBuffer`, so
 plain `http://<lan-ip>` makes the SPA throw a `FatalError`. It persists
 ALL state to `/data` (`server-files/account.sqlite`, `user-files/`), which
@@ -47,7 +47,7 @@ prefix (deferred; see the spec §5).
 There is no app code, no frontend build, no test suite — so the pipeline is much
 thinner than tg-catch's:
 
-1. `just redeploy` — push `addon/` to HAOS over SSH → rebuild → restart → logs.
+1. `just redeploy` — push `addons/actual_budget/` to HAOS over SSH → rebuild → restart → logs.
 2. `just smoke` — assert the Actual UI answers HTTP 2xx/3xx on `:5006`.
 3. `just ship "msg"` — commit (STAGED only) → push → deploy. **Only on an
    explicit go signal** ("коммить" / "go" / "задеплой"). Commit message in

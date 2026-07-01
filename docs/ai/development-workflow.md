@@ -4,24 +4,33 @@ Provider-agnostic reference for working on this repo. Committed to git.
 
 ## What this repo is
 
-A **wrapper / packaging** Home Assistant OS add-on for upstream
-[Actual Budget](https://actualbudget.org). We ship no application code: the
-add-on image is `actualbudget/actual-server` with one tweak (`USER root`). All
-the moving parts are the push-based deploy machinery, adapted from the sibling
+A **monorepo** of two local Home Assistant OS add-ons:
+
+- **`actual_budget`** — a **wrapper / packaging** add-on for upstream
+  [Actual Budget](https://actualbudget.org). No application code: the image is
+  `actualbudget/actual-server` with small tweaks (`USER root`, self-signed
+  HTTPS). This doc mainly covers it.
+- **`actual_capture`** — a Telegram + AI (OpenRouter) capture service that files
+  draft transactions into Actual. Has its own docs; see its spec.
+
+Both share the push-based deploy machinery, adapted from the sibling
 `telegram-capture` project.
 
 ## Layout
 
 ```
-addon/
-  config.yaml         # add-on manifest (slug, port 5006, no options, no ingress)
-  Dockerfile          # FROM actualbudget/actual-server:latest + USER root
+addons/
+  actual_budget/
+    config.yaml       # add-on manifest (slug, port 5006, no options, no ingress)
+    Dockerfile        # FROM actualbudget/actual-server:latest + USER root
+    run.sh            # generate self-signed cert on /data, serve HTTPS
+  actual_capture/     # Node/TS Telegram+AI capture service (own subtree)
 scripts/
   ha.sh               # SSH + Supervisor REST API wrapper (connection details)
-  deploy_addon.sh     # stage addon/ → tar over SSH → rebuild + restart
-Justfile              # redeploy / ship / rollback / smoke / ha-* lifecycle
+  deploy_addon.sh     # ADDON-generic: stage addons/<ADDON>/ → tar over SSH → rebuild + restart
+Justfile              # redeploy / ship / rollback / smoke / ha-* / cap-* (per-addon)
 docs/ai/              # this doc (committed, provider-agnostic)
-.claude/specs/        # design spec (gitignored, not committed)
+.claude/specs/        # design specs (gitignored, not committed)
 ```
 
 ## How Actual runs in the add-on
@@ -39,7 +48,7 @@ docs/ai/              # this doc (committed, provider-agnostic)
 Direct LAN port `5006` over **HTTPS** (`https://<haos-ip>:5006`). HTTPS is
 mandatory: Actual uses `SharedArrayBuffer` behind cross-origin isolation
 (COOP/COEP), which browsers only honour in a secure context (HTTPS or
-localhost); over plain HTTP the SPA throws a `FatalError`. `addon/run.sh`
+localhost); over plain HTTP the SPA throws a `FatalError`. `addons/actual_budget/run.sh`
 generates a self-signed cert on first boot (stored on `/data/certs`, so it
 survives rebuilds) and points `ACTUAL_HTTPS_KEY` / `ACTUAL_HTTPS_CERT` at it.
 The browser shows a one-time self-signed-cert warning that the user accepts.
@@ -76,7 +85,7 @@ First-time bring-up:
 ## Image tag policy
 
 The MVP runs `actualbudget/actual-server:latest`. Before declaring the add-on
-"kept", pin a concrete tag (e.g. `:25.x`) in `addon/Dockerfile` so rebuilds are
+"kept", pin a concrete tag (e.g. `:25.x`) in `addons/actual_budget/Dockerfile` so rebuilds are
 reproducible (spec §8 / §11).
 
 ## Verification / acceptance

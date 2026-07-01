@@ -1,47 +1,56 @@
-# actual-budget-addon — task commands
+# actual-budget-addon — monorepo task commands
 #
-# Wrapper/packaging add-on: no app code, no build, no test suite. The whole job
-# is shipping the add-on (Dockerfile + config.yaml) to HAOS and managing its
-# lifecycle. Deploy is push-based (code is tar'd over SSH; HAOS does not git pull).
+# Two HAOS add-ons live here: actual_budget (wrapper around upstream Actual) and
+# actual_capture (Telegram+AI capture service). Deploy is push-based (code is
+# tar'd over SSH; HAOS does not git pull). Most recipes take an `addon` arg that
+# defaults to actual_budget.
 
 # List available recipes
 default:
     @just --list
 
-# ─── Deploy pipeline (HAOS add-on) ─────────────────────────────────
+# ─── Deploy ────────────────────────────────────────────────────────
 
-# Fast iteration: push add-on files to HAOS, rebuild + restart (no git).
-redeploy:
-    bash scripts/deploy_addon.sh
+# Push an add-on to HAOS, rebuild + restart (no git). e.g. just redeploy actual_capture
+redeploy addon="actual_budget":
+    ADDON={{addon}} bash scripts/deploy_addon.sh
 
-# Full pipeline: commit (STAGED changes only) → push → deploy.
-# Stage what you want first (git add <paths>). Usage: just ship "commit message"
-ship msg:
+# Commit (STAGED only) → push → deploy. Stage first (git add <paths>).
+# Usage: just ship "msg" [addon]
+ship msg addon="actual_budget":
     if git diff --cached --quiet; then echo "Nothing staged — run 'git add <paths>' first." >&2; exit 1; fi
     git commit -m "{{msg}}"
     git push
-    bash scripts/deploy_addon.sh
+    ADDON={{addon}} bash scripts/deploy_addon.sh
 
 # Redeploy a previously committed git tag (no new commit/tag).
-rollback version:
-    REF=v{{version}} bash scripts/deploy_addon.sh
+rollback version addon="actual_budget":
+    REF=v{{version}} ADDON={{addon}} bash scripts/deploy_addon.sh
 
 # ─── Add-on lifecycle / diagnostics ────────────────────────────────
 
-# Tail add-on logs (default 40 lines): just ha-logs 80
-ha-logs n="40":
-    bash scripts/ha.sh logs {{n}}
+# Tail add-on logs (default 40 lines): just ha-logs actual_capture 80
+ha-logs addon="actual_budget" n="40":
+    SLUG=local_{{addon}} bash scripts/ha.sh logs {{n}}
 
 # Restart / stop the add-on; show state.
-ha-restart:
-    bash scripts/ha.sh restart
-ha-stop:
-    bash scripts/ha.sh stop
-ha-state:
-    bash scripts/ha.sh state
+ha-restart addon="actual_budget":
+    SLUG=local_{{addon}} bash scripts/ha.sh restart
+ha-stop addon="actual_budget":
+    SLUG=local_{{addon}} bash scripts/ha.sh stop
+ha-state addon="actual_budget":
+    SLUG=local_{{addon}} bash scripts/ha.sh state
 
-# Smoke test: assert the Actual web UI answers on the LAN port over HTTPS
-# (2xx/3xx). -k because the cert is self-signed. Override host with HA_HOST.
+# Push add-on options from addons/<addon>/.options.json and restart it.
+configure addon="actual_capture":
+    ADDON={{addon}} bash scripts/configure_addon.sh
+
+# DESTRUCTIVE: wipe an add-on's data and start fresh (uninstall + reinstall).
+# Usage: CONFIRM=yes just reset actual_budget
+reset addon="actual_budget":
+    ADDON={{addon}} bash scripts/reset_addon.sh
+
+# Smoke test the Actual web UI over HTTPS (self-signed → -k). actual_budget only.
 smoke:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -51,3 +60,23 @@ smoke:
       2*|3*) echo "OK — Actual answered HTTP $code on https://$host:5006/" ;;
       *)     echo "FAIL — got HTTP '${code:-no-response}' from https://$host:5006/" >&2; exit 1 ;;
     esac
+
+# ─── actual_capture (Node service) local checks ────────────────────
+
+# Install capture deps.
+cap-install:
+    npm --prefix addons/actual_capture ci
+
+# Typecheck (build) + unit tests for the capture service (the deploy gate).
+cap-test:
+    npm --prefix addons/actual_capture run build
+    npm --prefix addons/actual_capture test
+
+# Run the capture service locally (needs addons/actual_capture/.env).
+cap-serve:
+    npm --prefix addons/actual_capture run dev
+
+# One-off: seed Actual with current state from addons/actual_capture/seed.yaml
+# (idempotent). Needs ACTUAL_* in addons/actual_capture/.env.
+cap-seed:
+    npm --prefix addons/actual_capture run seed

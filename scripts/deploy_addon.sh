@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Deploy the actual_budget local HAOS add-on over SSH.
+# Deploy a local HAOS add-on from this monorepo over SSH.
 #
-# This is a wrapper/packaging add-on: there is NO application code of our own.
-# The build context is just the add-on files (config.yaml + Dockerfile, and the
-# optional icon/logo). The Dockerfile pulls upstream actualbudget/actual-server
-# and Supervisor builds it on the box.
+# Addon-generic: pick which add-on with ADDON (default actual_budget). The build
+# context is the whole addons/<ADDON>/ directory (minus node_modules/dist). The
+# Dockerfile is built on the box by Supervisor.
 #
 # Dev loop (no REF): Supervisor `rebuild` + `restart`.
 # Versioned deploy (REF set): `store/reload` + `update` so Supervisor also
@@ -12,14 +11,20 @@
 #
 # Connection details live in scripts/ha.sh (HA_HOST / HA_PORT / HA_KEY / SLUG).
 #
-#   bash scripts/deploy_addon.sh            # deploy the current working tree
-#   REF=v0.1.0 bash scripts/deploy_addon.sh # deploy a committed git ref (release / rollback)
+#   bash scripts/deploy_addon.sh                       # deploy actual_budget (working tree)
+#   ADDON=actual_capture bash scripts/deploy_addon.sh  # deploy actual_capture
+#   REF=v0.1.0 bash scripts/deploy_addon.sh            # deploy a committed git ref
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
+
+ADDON="${ADDON:-actual_budget}"
+ADDON_DIR="addons/$ADDON"
+REMOTE_DIR="/addons/$ADDON"
+# Local add-ons are exposed by Supervisor under a local_ prefix.
+export SLUG="${SLUG:-local_$ADDON}"
 HA="bash $REPO_ROOT/scripts/ha.sh"
-REMOTE_DIR="/addons/actual_budget"
 REF="${REF:-}"
 
 STAGE="$(mktemp -d)"
@@ -40,10 +45,14 @@ else
 fi
 cd "$BUILD_ROOT"
 
-echo "==> Staging build context"
-cp addon/config.yaml addon/Dockerfile addon/run.sh "$STAGE/"
-# Optional cosmetic assets — copied only if present (none in the MVP).
-cp addon/icon.png addon/logo.png "$STAGE/" 2>/dev/null || true
+[ -f "$ADDON_DIR/config.yaml" ] || { echo "ABORT: $ADDON_DIR/config.yaml not found." >&2; exit 1; }
+
+echo "==> Staging build context from $ADDON_DIR"
+# rsync (not cpio) — cpio -p refuses to write through the /var->/private/var
+# symlink that mktemp -d returns on macOS. Exclude build/deps artifacts.
+rsync -a --exclude='node_modules' --exclude='dist' --exclude='*.tsbuildinfo' \
+  --exclude='.env' --exclude='.options.json' \
+  "$ADDON_DIR/" "$STAGE/"
 echo "    staged files: $(find "$STAGE" -type f | wc -l | tr -d ' ')"
 
 echo "==> Transferring to $REMOTE_DIR"
@@ -71,8 +80,8 @@ else
   # Install it; otherwise rebuild the existing image in place.
   state="$($HA state-raw 2>/dev/null || echo unknown)"
   if [ "$state" = "unknown" ] || [ -z "$state" ]; then
-    echo "==> First install (pulls the upstream image — can take a few minutes)"
-    $HA api POST "/addons/${SLUG:-local_actual_budget}/install" >/dev/null
+    echo "==> First install (pulls/builds the image — can take a few minutes)"
+    $HA api POST "/addons/$SLUG/install" >/dev/null
   else
     echo "==> Rebuilding add-on image (this can take a few minutes on first build)"
     $HA rebuild
