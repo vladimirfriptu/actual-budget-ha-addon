@@ -17,6 +17,15 @@ const rawSchema = z.object({
   ACTUAL_SYNC_ID: z.string().min(1, 'ACTUAL_SYNC_ID is required'),
   ACTUAL_E2E_PASSWORD: z.string().optional().default(''),
   DEFAULT_CASH_ACCOUNT: z.string().min(1).default('Наличные'),
+  // Fuel (and non-cash defaults in a /draft session) land here when no account is stated.
+  DEFAULT_CARD_ACCOUNT: z.string().min(1).default('Монобанк чёрная'),
+  // Monobank integration is inert unless MONO_TOKEN is set.
+  MONO_TOKEN: z.string().optional().default(''),
+  MONO_POLL_MINUTES: z.coerce.number().int().positive().default(60),
+  MONO_BATCH_SIZE: z.coerce.number().int().positive().default(10),
+  MONO_FLUSH_HOUR: z.coerce.number().int().min(0).max(23).default(21),
+  MONO_BALANCE_HOUR: z.coerce.number().int().min(0).max(23).default(9),
+  MONO_START_DATE: z.string().optional().default(''),
 });
 
 export interface AppConfig {
@@ -32,6 +41,13 @@ export interface AppConfig {
   actualSyncId: string;
   actualE2ePassword: string;
   defaultCashAccount: string;
+  defaultCardAccount: string;
+  monoToken: string;
+  monoPollMinutes: number;
+  monoBatchSize: number;
+  monoFlushHour: number;
+  monoBalanceHour: number;
+  monoStartDate: string;
 }
 
 // Just the fields needed to talk to Actual — used by the one-off seed script,
@@ -93,5 +109,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     actualSyncId: v.ACTUAL_SYNC_ID,
     actualE2ePassword: v.ACTUAL_E2E_PASSWORD,
     defaultCashAccount: v.DEFAULT_CASH_ACCOUNT,
+    defaultCardAccount: v.DEFAULT_CARD_ACCOUNT,
+    monoToken: v.MONO_TOKEN,
+    monoPollMinutes: v.MONO_POLL_MINUTES,
+    monoBatchSize: v.MONO_BATCH_SIZE,
+    monoFlushHour: v.MONO_FLUSH_HOUR,
+    monoBalanceHour: v.MONO_BALANCE_HOUR,
+    monoStartDate: v.MONO_START_DATE,
   };
 }

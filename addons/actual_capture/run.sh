@@ -23,6 +23,13 @@ const map = {
   actual_budget_sync_id: 'ACTUAL_SYNC_ID',
   actual_e2e_password: 'ACTUAL_E2E_PASSWORD',
   default_cash_account: 'DEFAULT_CASH_ACCOUNT',
+  default_card_account: 'DEFAULT_CARD_ACCOUNT',
+  mono_token: 'MONO_TOKEN',
+  mono_poll_minutes: 'MONO_POLL_MINUTES',
+  mono_batch_size: 'MONO_BATCH_SIZE',
+  mono_flush_hour: 'MONO_FLUSH_HOUR',
+  mono_balance_hour: 'MONO_BALANCE_HOUR',
+  mono_start_date: 'MONO_START_DATE',
 };
 const sh = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
 for (const [k, env] of Object.entries(map)) {

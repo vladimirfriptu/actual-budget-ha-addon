@@ -10,5 +10,12 @@
   "actual_password": "",
   "actual_budget_sync_id": "",
   "actual_e2e_password": "",
-  "default_cash_account": "Наличные"
+  "default_cash_account": "Наличные",
+  "default_card_account": "Монобанк чёрная",
+  "mono_token": "",
+  "mono_poll_minutes": 60,
+  "mono_batch_size": 10,
+  "mono_flush_hour": 21,
+  "mono_balance_hour": 9,
+  "mono_start_date": ""
 }

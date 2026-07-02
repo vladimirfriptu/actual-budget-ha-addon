@@ -16,7 +16,7 @@ export interface BotHandlers {
   onPhoto(input: PhotoInput): Promise<DraftOffer[]>;
   onVoice(ogg: Buffer): Promise<DraftOffer[]>;
   onApprove(id: string): Promise<string>;
-  onCommand(cmd: 'start' | 'help' | 'vocab' | 'refresh'): Promise<string>;
+  onCommand(cmd: 'start' | 'help' | 'vocab' | 'refresh' | 'draft' | 'release' | 'cancel'): Promise<string>;
 }
 
 async function fetchFileBuffer(api: Api, token: string, fileId: string): Promise<Buffer | null> {
@@ -70,6 +70,9 @@ export function createBot(token: string, ownerChatId: number, handlers: BotHandl
   bot.command('help', (ctx) => reply(ctx, () => handlers.onCommand('help')));
   bot.command('vocab', (ctx) => reply(ctx, () => handlers.onCommand('vocab')));
   bot.command('refresh', (ctx) => reply(ctx, () => handlers.onCommand('refresh')));
+  bot.command('draft', (ctx) => reply(ctx, () => handlers.onCommand('draft')));
+  bot.command('release', (ctx) => reply(ctx, () => handlers.onCommand('release')));
+  bot.command('cancel', (ctx) => reply(ctx, () => handlers.onCommand('cancel')));
 
   bot.on('message:photo', (ctx) =>
     offerDrafts(

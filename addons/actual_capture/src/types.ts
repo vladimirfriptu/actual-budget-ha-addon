@@ -66,6 +66,24 @@ export interface DraftOffer {
   summary: string;
 }
 
+// ─── Batch categorization (Monobank import) ──────────────────────────────────
+// One LLM call assigns a category to many bank transactions at once.
+
+export interface CategItem {
+  index: number;
+  amountMajor: number;
+  mcc: number;
+  description: string;
+  comment?: string;
+}
+
+export const categorizeResultSchema = z.object({
+  results: z
+    .array(z.object({ index: z.number().int(), category: z.string().nullish() }))
+    .catch([]),
+});
+export type CategorizeResult = z.infer<typeof categorizeResultSchema>;
+
 // ─── Post plan: the concrete instruction for the Actual layer ────────────────
 // All amounts are integer minor units. Expenses are negative (outflow).
 

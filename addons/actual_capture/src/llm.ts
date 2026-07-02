@@ -1,4 +1,13 @@
-import { llmResultSchema, llmManyResultSchema, type LlmResult, type Vocab } from './types';
+import { parseAmount } from './money';
+import { mergeByCategory } from './group';
+import {
+  llmResultSchema,
+  llmManyResultSchema,
+  categorizeResultSchema,
+  type CategItem,
+  type LlmResult,
+  type Vocab,
+} from './types';
 
 // OpenRouter client. One call classifies intent and extracts fields as strict
 // JSON. Account/category names are constrained to the vocabulary; resolution to
@@ -56,12 +65,17 @@ export function buildSystemPrompt(vocab: Vocab, today: string, opts: { multi?: b
     '  withdrawal from a card, or moving money between the user\'s cards/jars.',
     '- Cash withdrawal ("снял/зняв готівку/налич…"): intent=transfer, from_account =',
     '  the card, to_account = the cash account from the list above.',
+    '- Purchases at a market/bazaar ("базар", "на базаре", "рынок", "на рынке",',
+    '  "ринок", "market") are paid in CASH by default: set account = the cash',
+    '  account from the list above, unless another paying account is explicitly named.',
     '- Money given or sent to ANOTHER PERSON or an external destination',
     '  ("перевёл жене", "відправив другу", "дал в долг") is NOT a transfer — it is an',
     '  EXPENSE: intent=expense, account = the paying account, and pick the best',
     '  matching category (e.g. a category about a transfer to a person, if one exists).',
     '- For a receipt photo, group line items into splits by category; amounts are per group.',
     '- Amounts are always positive numbers in major units; do not add currency signs.',
+    '- ALWAYS put the numeric amount in the `amount` field (even for transfers). The',
+    '  amount is usually the first number in the message. Never leave it only in `note`.',
   ].join('\n');
 }
 
@@ -128,7 +142,12 @@ export async function classifyAndExtract(
 ): Promise<LlmResult> {
   const model = input.imageBase64 ? deps.visionModel : deps.textModel;
   const raw = await chatJson(buildMessages(input, vocab, deps.today), model, deps);
-  return llmResultSchema.parse(raw);
+  const result = llmResultSchema.parse(raw);
+  // Deterministic safety net: models sometimes drop the amount into `note` only.
+  if (result.amount == null) {
+    result.amount = parseAmount(input.text ?? input.caption ?? result.note);
+  }
+  return result;
 }
 
 /** Extract ALL transactions from a dictated (transcribed) message. */
@@ -142,5 +161,97 @@ export async function classifyAndExtractMany(
     { role: 'user', content: text },
   ];
   const raw = await chatJson(messages, deps.textModel, deps);
-  return llmManyResultSchema.parse(raw).transactions;
+  const results = llmManyResultSchema.parse(raw).transactions;
+  for (const r of results) {
+    if (r.amount == null) r.amount = parseAmount(r.note);
+  }
+  return results;
+}
+
+/** Prompt for the /draft…/release session: extract EACH item; code sums by category. */
+export function buildGroupPrompt(vocab: Vocab, today: string): string {
+  const accounts = vocab.accounts.map((a) => a.name).join(', ') || '(none)';
+  const categories = vocab.categories.map((c) => c.name).join(', ') || '(none)';
+  return [
+    'You are given several short shopping notes from ONE trip (one per line, or',
+    'comma-separated). Extract EACH purchased item as its OWN transaction — do NOT',
+    'sum or merge; the caller sums per category deterministically.',
+    `Today is ${today}.`,
+    '',
+    'Return ONLY a JSON object {"transactions": [ ... ]}, one entry per item, with:',
+    '- intent: always "expense"',
+    '- amount: this item\'s price, positive major units',
+    '- account: the paying account (from the list, or null)',
+    '- category: the budget category (from the list, or null)',
+    '- note: the item name only (e.g. "бананы")',
+    '- confidence, from_account, to_account, payee, date, splits: leave null/empty',
+    '',
+    'Rules:',
+    '- Assign the SAME category name to items of the same kind so they can be summed',
+    '  (e.g. бананы/яблоки/мясо/еда → all "Продукты").',
+    `- account MUST be chosen from these accounts (or null): ${accounts}`,
+    `- category MUST be chosen from these categories (or null): ${categories}`,
+    '- Context/account inference: the FIRST line may set context. "закупаюсь на',
+    '  базаре"/"на рынке"/"на базаре" ⇒ paying account = the cash account. Apply that',
+    '  account to every following item UNTIL a line changes it (e.g. "теперь в',
+    '  магазине", or a specific card is named).',
+    '- Fuel ("заправка", "заправился", "бензин", "топливо") is its OWN category. It is',
+    '  the EXCEPTION to the market-cash context: leave its account null (the caller',
+    '  routes fuel to the card).',
+    '- Market/"базар"/"рынок" purchases default to the cash account.',
+    '- A line that is only context ("закупаюсь на базаре") is NOT an item — skip it.',
+    '- Amounts are positive numbers in major units; do not add currency signs.',
+  ].join('\n');
+}
+
+/** Group a batch of quick notes into per-category draft expenses. Item
+ *  extraction is the LLM's job; summing per category is deterministic. */
+export async function groupExpenses(text: string, vocab: Vocab, deps: LlmDeps): Promise<LlmResult[]> {
+  const messages: ChatMessage[] = [
+    { role: 'system', content: buildGroupPrompt(vocab, deps.today) },
+    { role: 'user', content: text },
+  ];
+  const raw = await chatJson(messages, deps.textModel, deps);
+  const items = llmManyResultSchema.parse(raw).transactions;
+  for (const r of items) {
+    if (r.amount == null) r.amount = parseAmount(r.note);
+  }
+  return mergeByCategory(items);
+}
+
+/** Prompt for batch-categorizing already-parsed bank transactions. */
+export function buildCategorizePrompt(vocab: Vocab): string {
+  const categories = vocab.categories.map((c) => c.name).join(', ') || '(none)';
+  return [
+    'You assign a budget category to each bank-card transaction. Input is a JSON',
+    'array of items { index, amountMajor, mcc, description, comment }. amountMajor',
+    'is negative for spending, positive for income.',
+    '',
+    'Return ONLY a JSON object {"results": [{ "index": <same index>, "category": <name|null> }]}',
+    'with one result per input item, preserving the index.',
+    '',
+    'Rules:',
+    `- category MUST be chosen from this list, or null if none fits: ${categories}`,
+    "- Bank MCC/description is often wrong or generic — prefer the merchant name in",
+    '  description/comment over a literal reading of the MCC.',
+    '- If unsure, use null rather than guessing — a human will review.',
+  ].join('\n');
+}
+
+/** Categorize many bank transactions in one call. Returns category names aligned
+ *  to the input order (null when the model declined). Never throws on shape. */
+export async function categorizeBatch(
+  items: CategItem[],
+  vocab: Vocab,
+  deps: LlmDeps,
+): Promise<Array<string | null>> {
+  if (items.length === 0) return [];
+  const messages: ChatMessage[] = [
+    { role: 'system', content: buildCategorizePrompt(vocab) },
+    { role: 'user', content: JSON.stringify(items) },
+  ];
+  const raw = await chatJson(messages, deps.textModel, deps);
+  const parsed = categorizeResultSchema.parse(raw);
+  const byIndex = new Map(parsed.results.map((r) => [r.index, r.category ?? null]));
+  return items.map((it) => byIndex.get(it.index) ?? null);
 }

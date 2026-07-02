@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toMinorUnits, formatMinor } from '../src/money';
+import { toMinorUnits, formatMinor, parseAmount } from '../src/money';
 
 describe('toMinorUnits', () => {
   it('scales major units by 100 and rounds', () => {
@@ -28,5 +28,24 @@ describe('formatMinor', () => {
   it('renders minor units back to a fixed-decimal string', () => {
     expect(formatMinor(12030)).toBe('120.30');
     expect(formatMinor(-1999)).toBe('-19.99');
+  });
+});
+
+describe('parseAmount', () => {
+  it('extracts the first number from the message', () => {
+    expect(parseAmount('3000 с белой карты на банку годовые подписки')).toBe(3000);
+    expect(parseAmount('снял 500 с монобанка')).toBe(500);
+  });
+
+  it('handles thousands spaces and decimal comma/dot', () => {
+    expect(parseAmount('3 000 на еду')).toBe(3000);
+    expect(parseAmount('кофе 12,50')).toBe(12.5);
+    expect(parseAmount('такси 199.99')).toBe(199.99);
+  });
+
+  it('returns null when there is no number or it is non-positive', () => {
+    expect(parseAmount('перевёл жене с карты')).toBeNull();
+    expect(parseAmount('')).toBeNull();
+    expect(parseAmount(null)).toBeNull();
   });
 });

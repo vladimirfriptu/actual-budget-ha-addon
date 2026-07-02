@@ -57,6 +57,12 @@ export class ActualClient {
     };
   }
 
+  /** Current cleared+uncleared balance of an account, in integer minor units. */
+  async getBalance(accountId: string): Promise<number> {
+    await api.sync();
+    return api.getAccountBalance(accountId);
+  }
+
   /** File a plan into Actual as a draft (uncleared, #draft in notes). */
   async post(plan: PostPlan): Promise<void> {
     await api.sync();
