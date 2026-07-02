@@ -72,7 +72,20 @@ case "$cmd" in
     api POST "/store/reload" >/dev/null && echo reloaded
     ;;
   update)
-    api POST "/addons/$SLUG/update" | jq -r .result
+    # Supervisor transiently 400s an update until the store cache refreshes, so
+    # reload the store and retry a few times. Use a non -f curl to keep the body
+    # (api() uses `curl -f`, which would abort on the transient 400).
+    out=""
+    for _ in 1 2 3 4 5; do
+      ha_ssh "curl -fsS -X POST -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" http://supervisor/store/reload" >/dev/null 2>&1 || true
+      out="$(ha_ssh "curl -sS -X POST -H \"Authorization: Bearer \$SUPERVISOR_TOKEN\" http://supervisor/addons/$SLUG/update" 2>/dev/null || true)"
+      case "$out" in
+        *'"result":"ok"'*) echo ok; exit 0 ;;
+      esac
+      sleep 3
+    done
+    echo "update failed after retries: ${out:-no response}" >&2
+    exit 1
     ;;
   restart)
     api POST "/addons/$SLUG/restart" | jq -r .result
