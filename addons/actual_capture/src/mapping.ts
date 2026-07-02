@@ -182,7 +182,7 @@ function planTransaction(
   let subtransactions: SubPlan[] | undefined;
   let categoryId: string | undefined;
 
-  if (splits.length > 0) {
+  if (splits.length >= 2) {
     subtransactions = splits.map((s) => {
       const cat = resolveCategory(s.category, vocab.categories);
       if (s.category && !cat) warnings.push(`категория не распознана: '${s.category}'`);
@@ -194,9 +194,14 @@ function planTransaction(
     });
     amountMinor = subtransactions.reduce((sum, s) => sum + s.amountMinor, 0);
   } else {
-    amountMinor = outflow(amountMinorOrZero(llm.amount, warnings));
-    const cat = resolveCategory(llm.category, vocab.categories);
-    if (llm.category && !cat) warnings.push(`категория не распознана: '${llm.category}'`);
+    // A lone "split" is just the expense restated — fold it into a plain
+    // transaction instead of a degenerate one-child split in Actual.
+    const single = splits[0];
+    const amountValue = single ? single.amount : llm.amount;
+    const categoryQuery = single?.category ?? llm.category;
+    amountMinor = outflow(amountMinorOrZero(amountValue, warnings));
+    const cat = resolveCategory(categoryQuery, vocab.categories);
+    if (categoryQuery && !cat) warnings.push(`категория не распознана: '${categoryQuery}'`);
     categoryId = cat?.id;
   }
 

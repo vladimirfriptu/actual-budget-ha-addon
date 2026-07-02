@@ -100,6 +100,24 @@ describe('planFromLlm — receipt splits', () => {
     expect(plan.subtransactions?.[1]).toMatchObject({ amountMinor: -1250, categoryId: 'cat-build' });
     expect(plan.amountMinor).toBe(-4250);
   });
+
+  it('collapses a lone one-item split into a plain expense (no split wrapper)', () => {
+    // Models sometimes echo a single-item `splits` for a plain purchase
+    // ("Базар дыня и клубника 600"); it must not become a degenerate split.
+    const llm = parse({
+      intent: 'expense',
+      account: 'нал',
+      amount: 600,
+      category: 'продукты',
+      note: 'Базар дыня и клубника',
+      splits: [{ amount: 600, category: 'продукты', note: 'Базар дыня и клубника' }],
+    });
+    const { plan } = planFromLlm(llm, vocab, opts);
+    if (plan.kind !== 'transaction') throw new Error('wrong kind');
+    expect(plan.subtransactions).toBeUndefined();
+    expect(plan.amountMinor).toBe(-60000);
+    expect(plan.categoryId).toBe('cat-food');
+  });
 });
 
 describe('planFromLlm — transfer', () => {
